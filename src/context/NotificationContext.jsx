@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { io } from 'socket.io-client';
-import api from '../api'; 
+import api from '../api';
+import { requestNotificationPermission } from '../firebase';
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
 
@@ -50,8 +51,11 @@ export const NotificationProvider = ({ children, currentUser }) => {
     const newSocket = io(BACKEND_URL);
     setSocket(newSocket);
 
-    // It's common practice to have a user join a room with their own ID to receive directed events
-    newSocket.emit("join_room", currentUser._id);
+    // Tell the server this user is now online (used for offline push notifications)
+    newSocket.emit('user_online', currentUser._id);
+
+    // Also join a personal socket room so server can target this user directly
+    newSocket.emit('join_room', currentUser._id);
 
     // Listen for new messages globally
     newSocket.on("receive_message", (message) => {
@@ -85,6 +89,28 @@ export const NotificationProvider = ({ children, currentUser }) => {
       setSocket(null);
     };
   }, [currentUser]);
+
+  // ─── FCM Token Registration ──────────────────────────────────
+  // After the user logs in, request notification permission and
+  // save the FCM token to the backend. This runs once per session.
+  useEffect(() => {
+    if (!currentUser?._id) return;
+
+    const registerFcmToken = async () => {
+      try {
+        const token = await requestNotificationPermission();
+        if (token) {
+          await api.post('/users/fcm-token', { fcmToken: token });
+          console.log('FCM token saved to backend.');
+        }
+      } catch (error) {
+        // Non-fatal — user may have denied notifications or browser may not support it
+        console.warn('Could not register FCM token:', error.message);
+      }
+    };
+
+    registerFcmToken();
+  }, [currentUser?._id]);
 
   const markAllAsRead = async () => {
     if (!currentUser?._id) return;

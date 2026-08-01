@@ -40,7 +40,7 @@ export default function ChatAppLayout() {
   // ─── Login Handler ───────────────────────────────────────────
   const handleLoginSuccess = async (response) => {
     try {
-      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+      const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
       const res = await fetch(`${BACKEND_URL}/api/auth/google-login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
